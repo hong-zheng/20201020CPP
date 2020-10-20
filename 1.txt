@@ -1,0 +1,1089 @@
+
+void test(){
+	cout << "hongzheng" << endl;
+}
+typedef int HPDataType;
+// 堆：就是一个顺序表
+
+typedef struct Heap{
+	HPDataType* _array;
+	int _size;
+	int _capacity;
+} Heap;
+
+void Swap(HPDataType* arr, int i, int j){
+	HPDataType tmp = arr[i];
+	arr[i] = arr[j];
+	arr[j] = tmp;
+}
+
+// 小堆的向下调整
+// 大的向下调整，小的向上调整
+// parent : 起始调整位置
+// size : arr 堆的大小
+void shiftDown(HPDataType* arr, int size, int parent){
+	// 先算出左孩子位置
+	int child = 2 * parent + 1;
+
+	while (child < size){
+		// 从左右孩子中选一个最大
+		if (child < size && arr[child + 1] < arr[child])
+			++child;
+		// 和父节点比较
+		if (arr[child] < arr[parent]){
+			// 交换
+			Swap(arr, child, parent);
+			// 更新
+			parent = child;
+			child = 2 * parent + 1;
+		}
+		else{
+			break;
+		}
+	}
+}
+
+void heapCreat(Heap* hp,HPDataType* arr, int size, int parent){
+	hp->_array = (HPDataType*)malloc(sizeof(HPDataType)*size);
+	memcpy(hp->_array, arr, sizeof(HPDataType)*size);
+
+	hp->_size = size;
+	hp->_capacity = size;
+
+	// 建堆，从最后一个非叶子节点开始建堆
+	// 最后一个非叶子节点为 (size-2)/2
+	for (int parent = (size - 2) / 2; parent >= 0;parent--){
+		shiftDown(hp->_array, size, parent);
+	}
+}
+
+void sd(int* arr, int size, int parent){
+	int child = 2 * parent + 1;
+	while (child < size){
+		if (child + 1 < size && arr[child + 1] < arr[child])
+			++child;
+		if (arr[parent] < arr[child]){
+			Swap(arr, parent, child);
+			parent = child;
+			child = 2 * parent + 1;
+		}
+		else{
+			break;
+		}
+	}
+}
+
+/*
+	操作的效率为O(1)
+	哈希表
+*/
+class BitMap{
+public:
+	BitMap(size_t range){
+		// 只需要数据范围/32 ，
+		// +1 :保证至少有一个空间
+		_bit.resize(range / 32+1);
+	}
+
+	// 查询:Test
+	bool Test(size_t n){
+		// 整数位置
+		int idx = n / 32;
+		// bit 位置
+		int bitIdx = n % 32;
+		// 获取对应的bit位的二进制值
+		if ((_bit[idx] >> bitIdx) & 1)
+			return true;
+		else
+			return false;
+	}
+	// 存储:Set
+	void Set(size_t n){
+		int idx = n / 32;
+		int bitIdx = n % 32;
+		// 当前位置的数据或上1左移bitIdx位
+		_bit[idx] |= (1 << bitIdx);
+	}
+	// 删除：将对应的位置上的比特位上的位赋值为0
+	void Rset(size_t n){
+		int idx = n / 32;
+		int bitIdx = n % 32;
+		// 将1移到对应的位置，再做取反的操作，再取&操作
+		_bit[idx] &= ~(1 << bitIdx);
+	}
+private:
+	vector<int> _bit;
+};
+
+void testBit(){
+	BitMap bit(100);
+	bit.Set(14);
+	bit.Set(40);
+	bit.Set(34);
+	bit.Set(43);
+
+	bool ret = bit.Test(14);
+	cout << ret << endl;
+	ret = bit.Test(20);
+	cout << ret << endl;
+}
+#include <string>
+struct strToInt1{
+	size_t operator()(const string& str){
+		size_t hash = 0;
+		for (auto& ch : str){
+			hash = hash * 131 + ch;
+		}
+		return hash;
+	}
+};
+struct strToInt2{
+	size_t operator()(const string& str){
+		size_t hash = 0;
+		size_t magic = 63689;
+		for (auto& ch : str){
+			hash = hash*magic + ch;
+			magic *= 378551;
+		}
+		return hash;
+	}
+};
+
+struct strToInt3{
+	size_t operator()(const string& str){
+		size_t hash = 0;
+		size_t magic = 63689;
+		for (auto& ch : str){
+			hash = hash*magic + ch;
+			magic *= 378551;
+		}
+		return hash;
+	}
+};
+
+template <class T,class HF1,class HF2,class HF3>
+class BloomFilter{
+public:
+	// range ： 信息的总的数目
+	// 与哈希函数与布隆函数有关系
+	// bit位数量 = 哈希函数个数 * 数据量/ln2
+	// ln2 -> 0.7
+	// 3个哈希函数*num*0.7
+	//5*num = 能够保证其准确率
+	BloomFilter(size_t num)
+		:_bit(5*num)
+		// 比特位和数据量范围是一样大
+		, _bitCount(5*num)
+	{}
+
+	// Set
+	void Set(const T& value){
+		HF1 hf1;
+		HF2 hf2;
+		HF3 hf3;
+		// 先计算对应的哈希值
+		size_t hashCode1 = hf1(value);
+		size_t hashCode2 = hf2(value);
+		size_t hashCode3 = hf3(value);
+		// 产生的范围可能大于范围：因此需要规整
+		// 此处最简单的方法就是 取模
+		_bit.Set(hashCode1%_bitCount);
+		_bit.Set(hashCode2%_bitCount);
+		_bit.Set(hashCode3%_bitCount);
+	}
+	// Test:由于虽然在一定概率上避免了哈希冲突
+	// 但是并不能解决哈希冲突，所以查询到的结果可能是错误的
+	bool Test(size_t n){
+		// 只要有一位没有被设置，就表示该数没有被设置过
+		HF1 hf1;
+		size_t hashCode1 = hf1(value);
+		if (!_bit.Test(hashCode1%_bitCount)){
+			return false;
+		}
+		HF2 hf2;
+		size_t hashCode2 = hf2(value);
+		if (!_bit.Test(hashCode2%_bitCount)){
+			return false;
+		}
+		HF3 hf3;
+		size_t hashCode3 = hf3(value);
+		if (!_bit.Test(hashCode3%_bitCount)){
+			return false;
+		}
+		// 返回 true : 不一定正确，但是正确的概率还是较大
+		// 根据其对结果影响大小的情况来判断，然后得到不同的处理方式
+		// 可以增加哈希函数，给其更加标志位数来标识
+		return true;
+	}
+
+private:
+	BitMap _bit;
+	size_t _bitCount;
+};
+
+
+int maiwqn(){
+	// int arr[] = { 5, 7, 6,    9, 11, 10, 8 };
+	// cout << VerifySquenceOfBST(arr, sizeof(arr) / sizeof(arr[0])) << endl;
+//	testBit();
+	// cout << add(23, 1) << endl;
+
+	// cout << (2 >> 1) << endl;
+	// 24
+	// 16 8 4 2 1
+	// 11000
+	// int a = 24;
+	// cout << (a >> 1) << endl;
+	system("pause");
+	return 0;
+}
+
+
+int add(int a, int b){
+	int sum = 0;
+	int carray = 0;
+	while (b != 0){
+		sum = a^b;
+		carray = (a&b) << 1;
+		a = sum;
+		b = carray;
+	}
+	return sum;
+}
+
+
+int sub(int a, int b){
+	int sum = 0;
+	int carray = 0;
+	while (b != 0){
+		sum = a^b;
+		carray = (a&b) >> 1;
+		a = sum;
+		b = carray;
+	}
+	return sum;
+}
+
+
+/*
+// 测试一个后序遍历的树是否为搜索树
+bool VerifySquenceOfBST(int sequence[], int len){
+if (sequence == nullptr || len <= 0){
+return false;
+}
+// 5 7 6    9 11 10 8
+// 得到当前子序列的根节点
+int root = sequence[len - 1];
+
+// 在二叉搜索树中左子树的节点都小于根节点
+int i = 0;
+for (; i < len; ++i){
+if (sequence[i] > root)
+break;
+}
+// 在二叉搜索树中右子树的节点大于根节点
+int j = i;
+// 如果在右子树中还有小于根节点的节点，则直接 return false
+for (; j < len - 1; ++j)
+if (sequence[j] < root)
+return false;
+
+// 判断左子树是不是二叉搜索树
+bool left = true;
+if (i>0)
+left = VerifySquenceOfBST(sequence, i);
+
+// 判断右子树是不是二叉搜索树
+bool right = true;
+if (i < len - 1)
+right = VerifySquenceOfBST(sequence + i, len - i - 1);
+
+return (left && right);
+}
+
+*/
+
+struct BinaryTreeNode{
+	int val;
+	BinaryTreeNode* left;
+	BinaryTreeNode* right;
+};
+
+void FPath(BinaryTreeNode* pRoot, int expNum, vector<int>& path, int& cur){
+	// 增加当前的值以及路径
+	cur += pRoot->val;
+	path.push_back(pRoot->val);
+
+	// 如果当前是叶子节点，同时路径上的值和也满足输入的值
+	// 打印出这条路径
+	bool isLeaf = pRoot->left == nullptr && pRoot->right == nullptr;
+	// 满足等值且为叶子节点
+	if (cur == expNum && isLeaf){
+		cout << "路径可为:" << endl;
+		vector<int>::iterator iter = path.begin();
+		for (; iter != path.end(); ++iter)
+			cout << *iter << " ";
+		cout << endl;
+	}
+
+	// 如果不是叶子节点，则遍历它的子节点
+	if (pRoot->left != nullptr)
+		FPath(pRoot->left, expNum, path, cur);
+	if (pRoot->right != nullptr)
+		FPath(pRoot->right, expNum, path, cur);
+	
+	// 回溯
+	// 在返回父节点之前，在路径上删除当前节点
+	// 并在 cur 中减去当前节点的值
+	cur -= pRoot->val;
+	path.pop_back();
+}
+
+// 1 2 3 3 3 3 4 5
+// 找到一个排序数组中的k所出现的次数
+int GetFirstK(int* data, int len, int k, int start, int end){
+	if (start > end){
+		return -1;
+	}
+	int midIdx = (start + end) / 2;
+	int midData = data[midIdx];
+
+	if (midData == k){
+		if ((midIdx > 0 && data[midIdx - 1] != k)
+			|| midIdx == 0){
+			return midIdx;
+		}
+		else{
+			end = midIdx - 1;
+		}
+	}
+	else if (midData > k){
+		end = midIdx - 1;
+	}
+	else{
+		end = midIdx + 1;
+	}
+	return GetFirstK(data, len, k, start, end);
+}
+
+// 找到最后一个k所在的位置
+int GetLastK(int* data, int len, int k, int start, int end){
+	if (start > end){
+		return -1;
+	}
+	int midIdx = (start + end) / 2;
+	int midData = data[midIdx];
+
+	if (midData == k){
+		if ((midIdx == len-1)|| (midIdx < len - 1 && data[midIdx + 1] != k)){
+			return midIdx;
+		}
+		else
+		{
+			start = midIdx + 1;
+		}
+	}
+	else if (midData < k){
+		start = midIdx + 1;
+	}
+	else {
+		end = midIdx + 1;
+	}
+	return GetLastK(data, len, k, start, end);
+}
+
+int GetNumberOfK(int* data, int len, int k){
+	int number = 0;
+	if (data != NULL && len > 0){
+		int f = GetFirstK(data, len, k, 0, len - 1);
+		int l = GetLastK(data, len, k, 0, len - 1);
+		if (f > -1 && l > -1){
+			number = l - f + 1;
+		}
+	}
+	return number;
+}
+
+// 判断一颗树是否为平衡树
+bool isBalanced(BinaryTreeNode* pRoot, int* pDepth){
+	if (pRoot == nullptr){
+		*pDepth = 0;
+		return true;
+	}
+	int left=0,right=0;
+	if (isBalanced(pRoot->left, &left) && isBalanced(pRoot->right, &right)){
+		int diff = left - right;
+		if (diff <= 1 && diff >= -1){
+			*pDepth = 1 + (left > right ? left : right);
+			return true;
+		}
+	}
+	return false;
+}
+
+void sxf(){
+	cout << "sxf start" << endl;
+
+	cout << "sxf end" << endl;
+}
+
+// 时间复杂度：最坏O(n^2） 平均O(n^2) 最好O(n)
+// 空间复杂度：O(1)
+// 数据敏感
+// 稳定
+void bubbleSort(int* arr, int n){
+	while (n){
+		int end = n;
+		// 一轮冒泡排序
+
+		// 对于有序的序列，通过标签提案结束排序过程
+		// int flag = false;
+		int flag = 1; // 一轮排序过程中没有发生元素的交换
+		for (int i = 0; i<end - 1; ++i){
+			// 相邻元素进行比较，大的向后移动
+			if (arr[i] > arr[i + 1]){
+				Swap(arr, i, i + 1);
+				flag = 0;
+			}
+		}
+		// 表示当前轮的数据没有发生交换，就表示数据已经有序
+		if (flag) break;
+		--n;
+	}
+}
+
+
+void bst(int* arr, int len){
+	for (int i = 0; i < len - 1; ++i){
+		for (int j = 0; j < len - i - 1; ++j){
+			if (arr[j + 1] < arr[j]){
+				Swap(arr, j + 1, j);
+			}
+		}
+	}
+}
+void tb(){
+	int arr[] = { 32, 789, 2, 78, 57, 2, 40, 97, 8 };
+	int len = sizeof(arr) / sizeof(arr[0]);
+	bst(arr, len);
+	for (int i = 0; i < len; ++i){
+		cout << arr[i] << " ";
+	}
+	cout << endl;
+}
+
+
+template<class T>
+T add(const T& a, const T& b){
+	return a + b;
+}
+
+template<class T1,class T2>
+T1 add(const T1& a, const T2& b){
+	return a + b;
+}
+
+void tt(){
+	int a = 10;
+	int b = 20;
+	char c = 'a';
+	char d = 'b';
+	cout<<add(a, b)<<endl;
+	cout << add<int>(a, c) << endl;
+
+	// 普通函数与模板函数共存时
+	// 如果普通函数的参数类型可以完全匹配
+	// 类似直接吃现成的饭
+	// 如果普通函数不能够完全匹配
+	// 但是实例化的函数可以完全匹配参数类型，则进行实例化
+	// 普通函数与模板函数共存时，但是指定了需要实例化，则进行实例化
+}
+
+// 类模板
+template<class T1,class T2,class T3>
+class Date{
+public:
+	Date(T1 year, T2 month, T3 day)
+		:_year(year), _month(month), _day(day)
+	{	}
+	void Display();
+private:
+	T1 _year;
+	T2 _month;
+	T3 _day;
+};
+
+template<class T1,class T2,class T3>
+void Date<T1, T2, T3>::Display(){
+	cout << _year << "-" << _month << "-" << _day << endl;
+}
+void td(){
+	// 类模板不能进行隐式实例化，只能进行显式实例化
+	Date<int, int, int> d(1020, 3, 4);
+	// 类模板
+	// 类型与类名不同
+	// 类型：类名+模板实例化参数类型>
+}
+
+#include <string>
+
+void test1(){
+	/*
+	default (1)
+		string();
+	copy(2)
+		string(const string& str);
+	substring(3)
+		string(const string& str, size_t pos, size_t len = npos);
+	from c - string(4)
+		string(const char* s);
+	from sequence(5)
+		string(const char* s, size_t n);
+	fill(6)
+		string(size_t n, char c);
+	range(7)
+		template <class InputIterator>
+	string(InputIterator first, InputIterator last);
+	*/
+	string str; //
+	// 用C的字符串创建C++对象字符串
+	// 可以用字符串，字符，字符串对象赋值
+	str = "1234567890";
+	string::iterator it = str.begin();
+	// 迭代器不仅可以遍历，还可解引用还可以修改，是可读可写的迭代器
+	while (it != str.end()){
+		cout << *it << " ";
+		++it;
+	}
+	cout << endl;
+
+	// const 迭代器不支持写操作，其为只读迭代器
+	string::const_iterator cit = str.cbegin();
+	string::const_reverse_iterator crt = str.crbegin();
+}
+
+void printString(const string& str){
+	string::const_iterator it = str.begin();
+	while (it != str.end()){
+		cout << *it << " ";
+		++it;
+	}
+}
+
+void t1(){
+	string str("1234567890");
+	// 大权限的赋值给小权限可以接受
+	// 但是 const 迭代器建议使用 const 接口获取 ： c...()
+	string::const_iterator cit = str.begin();
+	string::const_iterator cit2 = str.cbegin();
+
+	while (cit != str.end()){
+		cout << *cit << " ";
+		// const 迭代器不支持写操作，其为只读迭代器
+		++cit;
+	}
+	cout << endl;
+}
+
+void printString1(const string& str){
+	string::const_iterator it = str.cbegin();
+	while (it != str.end()){
+		cout << *it << " ";
+		++it;
+	}
+	cout << endl;
+}
+
+void  ts(){
+	string str("zhenghong");
+	cout << str.size() << endl;
+	cout << str.length() << endl;
+	cout << str.capacity() << endl;
+	cout << str.max_size() << endl;
+
+	// 只清空内容，不改变容量
+	str.clear();
+
+	cout << str.size() << endl;
+	cout << str.length() << endl;
+	cout << str.capacity() << endl;
+	cout << str.max_size() << endl;
+}
+
+void ts2(){
+	string str("1234567890");
+	cout << str.size() << endl;
+
+	cout << str.capacity() << endl;
+	// 给新的位置增加了 '\0'
+	str.resize(20);
+	cout << str.size() << endl;
+	// resize(n)
+	// 当n>size & n>capacity ：开空间，拷贝，释放原有空间，新的位置赋值
+	// 如果没有赋值字符，默认赋值\0
+	// 2 n<size 值修改size:只修改size
+	// 3 n>size , 且 n<capacity 新的位置赋值
+	// 如果没有赋值，就赋值 \0 修改size
+	str.resize(30, 'a');
+}
+
+void ts4(){
+	string str("0123456789");
+	cout << str.size() << endl;
+	cout << str.capacity() << endl;
+
+	// reserve : 只增加容量，不修改size，也不减少容量
+	// 先将容量增好，就不用再申请
+	// 使用 reserve 提前开好空间，后续可以节省增容的开销，提高代码效率
+	str.reserve(20);
+
+	cout << str.size() << endl;
+	cout << str.capacity() << endl;
+}
+
+void tr(){
+	string s;
+	// 容量和实际申请空间可能不同：字符串特点：以'\0'结束
+	// 需要给 \0 预留空间
+	// PJ版string增容过程：如果为空字符串对象，初始容量大小为15，
+	// 第一次增加容量2倍，后面以1.5倍增加
+	int sz = s.size();
+	int cap = s.capacity();
+	cout << "初始容量:" << cap << endl;
+	for (int i = 0; i < 200; ++i){
+		s.push_back(i);
+		if (cap != s.capacity()){
+			cap = s.capacity();
+			cout << cap << endl;
+		}
+	}
+}
+
+void ps(string& s){
+	for (char& e : s){
+		cout << e << " ";
+	}
+	cout << endl;
+}
+void trs(){
+	string s("12345");
+	cout << s.size() << endl;
+	cout << s.capacity() << endl;
+	ps(s);
+	s.resize(10,'a');
+	cout << s.size() << endl;
+	cout << s.capacity() << endl;
+	ps(s);
+	// 无论如何修改都不能修改原有的内容
+	// 其功能就是提高代码效率
+	s.reserve(20);
+	ps(s);
+	cout << s.size() << endl;
+	cout << s.capacity() << endl;
+
+	// 适当的缩小大小
+	s.shrink_to_fit();
+}
+
+void tst(){
+	string str("0123456789");
+	// 迭代器
+	string::iterator it = str.begin();
+	for (int i = 0; i < str.size(); ++i){
+		// [] 修饰符,可读可写接口
+		cout << str.operator[](i) << " ";
+	}
+	cout << endl;
+
+	for (int i = 0; i < str.size(); ++i){
+		cout << str.at(i) << " ";
+		//str.at(i) = 0;
+	}
+	cout << endl;
+	for (int i = 0; i < str.size(); ++i){
+		// at函数：访问数组越界会抛异常
+		// [] 函数：数组越界error，而不是异常
+		cout << str.at(i) << " ";
+	}
+	cout << endl;
+
+	// 由于string提供了begin end所以就可以使用范围for
+	// 也支持读写
+	// 底层通过迭代器来实现的
+	for (const auto& ch : str){
+		cout << ch << " ";
+	}
+	cout << endl;
+}
+void tss(){
+	string str("0123456789");
+	cout << str.substr(3, 3) << endl;
+}
+
+void dfs(int index, int n, vector<int>& boxs, vector<int>& book){
+	if (index == n + 1){
+
+	}
+
+	for (int i = 1; i <= n; ++i){
+		if (book[i] == 0){ // 第i张牌在手中
+			boxs[index] = i; // 现在第 i 号牌已经被用
+			// 处理下一个盒子
+			dfs(index + 1, n, boxs, book);
+			book[i] = 0;
+		}
+	}
+}
+int mswain(){
+	// tss();
+	// tst();
+//	trs();
+//	ts4();
+//	test1();
+	// tt();
+//	tb();
+//	sxf();
+	cout <<endl<< "zhenghong" << endl;
+	system("pause");
+	return 0;
+}
+
+/*
+#include<iostream>
+#include<cmath>
+#include<iomanip>
+#define n 4
+using namespace std;
+int main34()
+{
+	double Azg[n][n + 1], x[n], max0, g, d, e;
+	int i, j, k, i0, j0, k0, l;
+	cout << "请输入增广矩阵A:" << endl;
+	for (i = 0; i<n; i++)
+		for (j = 0; j<n + 1; j++)
+			cin >> Azg[i][j];//输入增广矩阵
+	cout << endl;
+	for (i0 = 0; i0<n; i0++)
+	{
+		for (j = 0; j<n + 1; j++)
+			cout << setw(9) << Azg[i0][j];//输出增广矩阵
+		cout << endl;
+	}
+	for (i = 0; i<n - 1; i++)//求主元
+	{
+		max0 = fabs(Azg[i][i]);
+		for (k = i; k<n; k++)
+			if (max0<fabs(Azg[k][i]))
+			{
+			max0 = fabs(Azg[k][i]);
+			l = k;
+			}
+		for (j = i; j<n + 1; j++)//换行
+		{
+			g = Azg[i][j];
+			Azg[i][j] = Azg[l][j];
+			Azg[l][j] = g;
+		}
+		for (k0 = i + 1; k0<n; k0++)//实施消元
+		{
+			e = Azg[k0][i] / Azg[i][i];
+			for (j = i; j<n + 1; j++)
+				Azg[k0][j] = Azg[k0][j] - e*Azg[i][j];
+		}
+		cout << endl;
+		cout << "以第" << i + 1 << "行为工具行，实施消元，输出增广矩阵" << endl;
+		for (i0 = 0; i0<n; i0++)
+		{
+			for (j = 0; j<n + 1; j++)
+				cout << setw(9) << Azg[i0][j];
+			cout << endl;
+		}
+	}
+	x[n - 1] = Azg[n - 1][n] / Azg[n - 1][n - 1];//回代
+	for (i0 = n - 2; i0 >= 0; i0--)
+	{
+		d = 0;
+		for (j0 = i0 + 1; j0<n; j0++)
+			d = d + Azg[i0][j0] * x[j0];
+		x[i0] = (Azg[i0][n] - d) / Azg[i0][i0];
+		cout << "x=" << x[i0] << endl;
+	}
+	cout << "x=" << x[n - 1] << endl;
+	system("pause");
+	return 0;
+}
+*/
+
+int isV(vector<int>& A, vector<int>& book){
+	int sz = book.size();
+	int V = 0;
+	for (int i = 0; i<sz; ++i){
+		if (book[i]){
+			V += A[i];
+		}
+	}
+	return V;
+}
+int calValue(vector<int>& V, vector<int>& book){
+	int value = 0;
+	for (int i = 0; i<book.size(); ++i){
+		if (book[i]){
+			value += V[i];
+		}
+	}
+	return value;
+}
+void dfs(vector<int>& A, vector<int>& book, vector<int>& V, int m, int& value){
+	// 计算体积，在体积满足的同时在计算价值
+	if (isV(A, book) <= m){
+		// 计算价值
+		int curV = calValue(V, book);
+		if (curV > value)
+			value = curV;
+	}
+	int sz = A.size();
+	for (int i = 0; i<sz; ++i){
+		if (book[i] == 0){
+			book[i] = 1;
+			dfs(A, book, V, m, value);
+			book[i] = 0;
+		}
+	}
+}
+int backPackII(int m, vector<int> &A, vector<int> &V) {
+	if (A.empty() || V.empty() || m<1) return 0;
+	// 多加一行一列，用于设置初始条件
+	// m : 可以容纳的重量
+	// n : 列
+	int n = A.size();
+	vector<int> book(n, 0);
+	int value = 0;
+	dfs(A, book, V, m, value);
+	return value;
+}
+#include <time.h>
+int maissn(){
+	size_t start = clock();
+	vector<int> A = {95, 75, 23, 73, 50, 22, 6, 57, 89, 98 };
+	vector<int> V = {89, 59, 19, 43, 100, 72, 44, 16, 7, 64};
+	int m = 300;
+	int value = backPackII(m, A, V);
+	cout << value << endl;
+	size_t end = clock();
+	cout << end - start << endl;
+	system("pause");
+	return 0;
+}
+
+// 自上而下的解决问题
+// 同时也可以自下而上的解决
+#define N 1000
+// 记忆化搜索：使用memo进行记忆
+vector<int> memo(1000,-1);
+int fib(int n){
+	if (n == 0)
+		return 0;
+	if (n == 1)
+		return 1;
+	if (memo[n] == -1)
+		memo[n] = fib(n - 1) + fib(n - 2);
+	return memo[n];
+}
+
+// 动态规划
+int fib(int n){
+	vector<int> memo(n + 1, -1);
+	memo[0] = 0;
+	memo[1] = 0;
+	// 用空间替换时间
+	for (int i = 2; i <= n; ++i){
+		memo[i] = memo[i - 1] + memo[i - 2];
+	}
+	return memo[n];
+}
+
+// 上n阶台阶
+int climbStairs(int n){
+	// 终止条件法1
+	// if (n == 0 || n==1) return 1;
+	// 终止条件法2
+	if (n == 1)
+		return 1;
+	if (n == 2){
+		return 2;
+	}
+	return climbStairs(n - 1) + climbStairs(n - 2);
+}
+
+int bI(int n){
+
+}
+// 整数分解其积最大值
+int ib(int n){
+
+}
+
+int max3(int a, int b, int c){
+	return max(a, max(b, c));
+}
+// 将 n 进行分割（至少分割成两部分），可以获得最大乘积
+int breakInteger(int n){
+	if (n == 1)
+		return 1;
+	int res = -1;
+	for (int i = 1; i <= n - 1; ++i){
+		res = max3(res, i*(n - i), i*breakInteger(n - i));
+	}
+	return res;
+}
+
+#include <cassert>
+int ibb(int n){
+	assert(n >= 2);
+	// memo[i] 表示将数字i分割（至少分成两部分）后得到的最大乘积
+	vector<int> memo(n + 1, -1);
+	memo[1] = 1;
+	for (int i = 2; i <= n; ++i){
+		// 求解memo[i]
+		for (int j = 1; j <= i - 1; ++j){
+			// j + (i-j)
+			j*(i - j), j*memo[i - j];
+		}
+	}
+}
+
+// 将 n 进行分割(至少分割两部分），可以获得的最大的乘积
+int bIR(int n){
+	if (n == 1){
+		return 1;
+	}
+	// 所以的分割的可能性
+	int res = -1;
+	for (int i = 1; i <= n - 1; ++i){
+		// i + (n-i)
+		// i*(n-i) : 就是直接分为的两部分
+		res = max3(res , i*(n-i),i*bIR(n - i));
+	}
+	return res;
+}
+
+#define N
+// 将 n 进行分割（至少分割成两部分），可以获得的最大乘积
+vector<int> memory;
+
+int breakInteger(int n){
+	if (n == 1)
+		return 1;
+	if (memory[n] != -1)
+		return memory[n];
+	int res = -1;
+	for (int i = 1; i <= n - 1; ++i){
+		res = max3(res, i*(n - i), i*breakInteger(n - i));
+	}
+	memo[n] = res;
+	return res;
+}
+
+// 动态规划的方法解决问题
+int dpB(int n){
+	// memo[i] 表示将数字i分割（至少分割成两部分）后得到的最大乘积
+	vector<int> memo(n + 1, -1);
+	memo[1] = 1;
+	for (int i = 2; i <= n; ++i){
+		// 求解 memo[i]
+		for (int j = 1; j <= i - 1; ++j){
+			// j + (i-j)
+			memo[i] = max3(memo[i], i*(i - j), j*memo[i - j]);
+		}
+	}
+}
+
+// 考虑抢劫 nums[index,...,nums.size()) 这个范围的所有房子
+int tryRob(vector<int>& nums, int index){
+	if (index >= nums.size)
+		return 0;
+	int res = 0;
+	for (int i = index; i < nums.size(); ++i){
+		 res = max(res,nums[i] + tryRob(nums, i + 2));
+	}
+	return res;
+}
+int rob(vector<int>& nums){
+	return tryRob(nums, 0);
+}
+
+class A{
+public:
+	vector<int> memo;
+	int tryRob(vector<int>& nums, int index){
+		if (index >= nums.size())
+			return 0;
+		if (memo[index] != -1){
+			return memo[index];
+		}
+
+		int res = 0;
+		for (int i = index; i < nums.size(); ++i){
+			res = max(res, nums[i]+tryRob(nums,index+2));
+		}
+		memo[index] = res;
+		return res;
+	}
+
+	// 对状态的定义
+	// 考虑偷取[x,...,n-1]范围里的房子（函数的定义）
+	int rob(vector<int>& nums){
+		int  n = nums.size();
+		if (n < 1) return 0;
+		// memo[i] 表示考虑抢劫  nums[i...n)所能获得的最大收益
+		vector<int> memo(n, -1);
+		memo[n - 1] = nums[n - 1];
+		for (int i = n - 2; i >= 0; --i){
+			// memo[i]
+			for (int j = i; j < n; ++j){
+				memo[i] = max(memo[i], nums[j] + (j+2<n?memo[j + 2]:0));
+			}
+		}
+		return memo[0];
+	}
+
+	// 考虑偷取[0,...,x]范围里的房子(函数定义)
+	int rob2(vector<int>& nums){
+		int n = nums.size();
+		if (n < 1) return 0;
+		vector<int> memo(n, -1);
+		memo[0] = nums[0];
+		for (int i = 1; i < n; ++i){
+			for (int j = i; j >= 2; --j){
+				memo[i] =  max(memo[i],nums[j] + (j-2>=0)?memo[j-2]:0)  ;
+			}
+		}
+		return memo[n - 1];
+	}
+};
+
+int rob(vector<int>& nums){
+	int n = nums.size();
+	if (n < 1) return 0;
+	vector<int> memo(n, -1);
+	memo[0] = nums[0] ;
+	for (int i = 1; i < n;++i){
+		for (int j = i; j >= 0; --j){
+			memo[i] = max(memo[i], memo[i]+(j-2>=0?nums[j-2]:0));
+		}
+	}
+	return memo[n - 1];
+}
+// 考虑偷取[x, ..., n - 1]范围里的房子（函数的定义）
+// 考虑偷取[x,...,n-1]范围里的房子
+int rob3(vector<int>& nums){
+	int n = nums.size();
+	vector<int> memo(n, -1);
+	memo[n - 1] = nums[n - 1];
+	for (int i = n - 2; i >= 0;--i){
+		for (int j = i; j < n; ++j){
+			memo[i] = max(memo[i], memo[i] + (j - 2 < n ? nums[j + 2] : 0));
+		}
+	}
+	return memo[0];
+}
